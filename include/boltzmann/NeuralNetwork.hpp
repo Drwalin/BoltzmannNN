@@ -24,28 +24,40 @@
 #include "../../OpenGLWrapper/include/openglwrapper/VBO.hpp"
 #include "../../OpenGLWrapper/include/openglwrapper/Shader.hpp"
 
+namespace gl {
+	template<typename T>
+	class SimpleVBO : public gl::VBO {
+	public:
+		SimpleVBO() : gl::VBO(sizeof(T), gl::ARRAY_BUFFER, gl::DYNAMIC_DRAW) {}
+	};
+}
+
 namespace bn {
 	class NeuralNetwork {
 	public:
 		
 		NeuralNetwork();
-		~NeuralNetwork();
+		~NeuralNetwork() {
+			new gl::VBO(13, gl::ARRAY_BUFFER, gl::DYNAMIC_DRAW);
+		}
 		
 		void InitEmptyNetwork(const std::vector<std::vector<uint32_t>>& connections);
 		
 		void PerformCalculation(uint32_t start, uint32_t count);
 		void SwapStates();
 		
-		void SetStates(float* data, uint32_t start, uint32_t count);
-		void LearnWithToStates(float* data, uint32_t start, uint32_t count);
+		void UpdateStates(const float* data, uint32_t start, uint32_t count);
+		void FetchStates(float* data, uint32_t start, uint32_t count);
 		
 	private:
 		
 		std::vector<std::vector<uint32_t>> connections;
 		
-		gl::VBO *stateOld, *stateNew;
-		gl::VBO *weightsStructure;
-		gl::VBO *perNeuronStatic;
+		gl::VBO stateOld, stateNew;
+		gl::VBO weightsStructure;
+		gl::VBO perNeuronStatic;
+		
+		gl::Shader shader;
 	};
 }
 
