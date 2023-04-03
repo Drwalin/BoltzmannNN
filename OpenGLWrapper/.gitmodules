@@ -1,0 +1,6 @@
+[submodule "thirdparty/SOIL2"]
+	path = thirdparty/SOIL2
+	url = https://github.com/SpartanJ/SOIL2.git
+[submodule "thirdparty/assimp"]
+	path = thirdparty/assimp
+	url = https://github.com/assimp/assimp.git
