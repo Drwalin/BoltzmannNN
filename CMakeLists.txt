@@ -24,7 +24,10 @@ add_library(Boltzmann SHARED
 )
 target_link_libraries(Boltzmann OpenGLWrapper)
 
-add_executable(prediction src/Main.cpp)
+add_executable(xor_example src/app/MainXOR.cpp)
+target_link_libraries(xor_example Boltzmann)
+
+add_executable(prediction src/app/Main.cpp)
 target_link_libraries(prediction Boltzmann)
 
 add_compile_options(-ggdb3)

@@ -9,11 +9,25 @@ option(BUILD_EXAMPLES "Build examples" ON)
 option(BUILD_DEBUG "Build debug" ON)
 option(BUILD_RELEASE "Build release" OFF)
 
-add_subdirectory(thirdparty/SOIL2)
+# add_subdirectory(thirdparty/SOIL2)
+include(CMakeFindDependencyMacro)
+find_dependency(OpenGL REQUIRED)
 
 include_directories(./include/)
 aux_source_directory(./include/openglwrapper/ header_files)
 aux_source_directory(./src/ source_files)
+
+include_directories(./thirdparty/SOIL2/src/common/)
+include_directories(./thirdparty/SOIL2/src/SOIL2/)
+aux_source_directory(./thirdparty/SOIL2/src/common/ soil2_common_files)
+aux_source_directory(./thirdparty/SOIL2/src/SOIL2/ soil2_files)
+
+add_library(soil2 SHARED
+	${soil2_common_files}
+	${soil2_files}
+)
+find_package(OpenGL REQUIRED)
+target_link_libraries(soil2 OpenGL::GL)
 
 add_library(OpenGLWrapper SHARED
 	${header_files}

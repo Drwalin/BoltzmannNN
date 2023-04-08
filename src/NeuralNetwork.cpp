@@ -16,18 +16,21 @@
  *  along with this program.  If not, see <https://www.gnu.org/licenses/>.
  */
 
+#include <ctime>
+
 #include <algorithm>
 #include <set>
 #include <random>
 
-#include "../include/boltzmann/NeuralNetwork.hpp"
 #include "openglwrapper/VBO.hpp"
+
+#include "../include/boltzmann/NeuralNetwork.hpp"
 
 namespace bn {
 	void RandomBuffer(std::vector<float>& buf, uint32_t count, float min,
 			float max) {
 		buf.resize(count);
-		static std::mt19937_64 mt;
+		static std::mt19937_64 mt(time(NULL));
 		std::uniform_real_distribution<float> dist(min/5, max/5.0);
 		for(float& v : buf) {
 			v =
@@ -37,6 +40,18 @@ namespace bn {
 				+dist(mt)
 				+dist(mt);
 		}
+	}
+	
+	void FillBufferWithRandom(gl::SimpleVBO<float>& vbo, float min, float max) {
+		std::vector<float> buf;
+		RandomBuffer(buf, vbo.GetVertexCount(), min, max);
+		vbo.UpdateElements(buf.data(), 0, vbo.GetVertexCount());
+	}
+	
+	void NeuralNetwork::UpdateBiasWeights(float* bias, float* weight) {
+		printf(" updating bias weights: %i %i\n", neuronsCount, weightsCount);
+		weights.Update(weight, 0, weightsCount*4);
+		this->bias.Update(bias, 0, neuronsCount*4);
 	}
 	
 	
@@ -60,7 +75,7 @@ namespace bn {
 					tmp.lower_bound(neuronsCount));
 		}
 		perNeuronStaticInfoHost.resize(neuronsCount);
-		uint32_t weightsCount = 0;
+		weightsCount = 0;
 		for(uint32_t i=0; i<this->structure.size(); ++i) {
 			std::vector<uint32_t>& v = this->structure[i];
 			if(v.size()) {
@@ -73,20 +88,28 @@ namespace bn {
 			}
 		}
 		
+		weightsStructure.Resize(weightsCount);
+		
+		for(uint32_t i=0; i<this->structure.size(); ++i) {
+			if(perNeuronStaticInfoHost[i].weights_count) {
+				weightsStructure.UpdateElements(this->structure[i].data(),
+						perNeuronStaticInfoHost[i].weights_start,
+						perNeuronStaticInfoHost[i].weights_count);
+			}
+		}
+		perNeuronStatic.Resize(neuronsCount);
 		perNeuronStatic.UpdateElements(perNeuronStaticInfoHost.data(), 0,
 				neuronsCount);
 		
-		std::vector<float> randomBuffer;
-		RandomBu
-		for(
-		
 		states[0].Resize(neuronsCount);
 		states[1].Resize(neuronsCount);
+		FillBufferWithRandom(states[0], -1, 1);
 		
-		weightsStructure.Resize(weightsCount);
 		weights.Resize(weightsCount);
+		FillBufferWithRandom(weights, -10000, 10000);
 		
 		bias.Resize(neuronsCount);
+		FillBufferWithRandom(bias, -10000, 10000);
 		
 		statePrevious = states;
 		stateNext = states+1;
@@ -98,63 +121,69 @@ namespace bn {
 	
 	void NeuralNetwork::UpdateStates(const float* data, uint32_t start,
 			uint32_t elements) {
-		states->UpdateElements(data, start, elements);
+		statePrevious->UpdateElements(data, start, elements);
 	}
 	
 	void NeuralNetwork::FetchStates(float* data, uint32_t start,
 			uint32_t elements) {
-		states->FetchElements(data, start, elements);
+		stateNext->FetchElements(data, start, elements);
 	}
 
 	
 	void NeuralNetwork::PerformCalculation(uint32_t start, uint32_t count) {
+		glMemoryBarrier(GL_ALL_BARRIER_BITS);
+		
 		calculationShader.Use();
-		calculationShader.SetUInt(1,
-				{start, std::min(neuronsCount-start, count)});
+		calculationShader.SetUInt(1, start);
+		calculationShader.SetUInt(2, std::min(neuronsCount-start, count));
 
 		statePrevious->BindBufferBase(gl::SHADER_STORAGE_BUFFER, 4);
 		stateNext->BindBufferBase(gl::SHADER_STORAGE_BUFFER, 5);
 		
-		perNeuronStatic.BindBufferBase(gl::SHADER_STORAGE_BUFFER, 5);
-		weights.BindBufferBase(gl::SHADER_STORAGE_BUFFER, 5);
-		bias.BindBufferBase(gl::SHADER_STORAGE_BUFFER, 5);
-		weightsStructure.BindBufferBase(gl::SHADER_STORAGE_BUFFER, 5);
+		perNeuronStatic.BindBufferBase(gl::SHADER_STORAGE_BUFFER, 3);
+		weights.BindBufferBase(gl::SHADER_STORAGE_BUFFER, 2);
+		bias.BindBufferBase(gl::SHADER_STORAGE_BUFFER, 1);
+		weightsStructure.BindBufferBase(gl::SHADER_STORAGE_BUFFER, 6);
 		
-		calculationShader.Dispatch(count, 1, 1);
+		calculationShader.DispatchRoundGroupNumbers(count, 1, 1);
+		glMemoryBarrier(GL_ALL_BARRIER_BITS);
 	}
 
 
 	const char* NeuralNetwork::CALCULATIONS_SOURCE_CODE = R"(#version 450 core
-layout (location=1) uniform uvec2 neuronsStartCount;
+layout (location=1) uniform uint neuronsStart;
+layout (location=2) uniform uint neuronsCount;
 
 struct NeuronStructureInfo {
 	uint start;
 	uint count;
 };
 
-layout (packed, std340, binding=1) readonly buffer Biases {
+layout (packed, binding=1) readonly buffer Biases {
 	float biases[];
 };
 
-layout (packed, std340, binding=2) readonly buffer Weights {
+layout (packed, binding=2) readonly buffer Weights {
 	float weights[];
 };
 
-layout (packed, std340, binding=3) readonly buffer NeuronsStructure {
+layout (packed, binding=3) readonly buffer NeuronsStructure {
 	NeuronStructureInfo neuronStructure[];
 };
 
-layout (packed, std340, binding=4) readonly buffer StatePrevious {
+layout (packed, binding=4) readonly buffer StatePrevious {
 	float x[];
 };
 
-layout (packed, std340, binding=5) writeonly buffer StateNext {
+layout (packed, binding=5) writeonly buffer StateNext {
 	float y[];
 };
 
-layout (packed, std340, binding=5) readonly buffer ConnectedNeurons {
+layout (packed, binding=6) readonly buffer ConnectedNeurons {
 	uint connectedNeurons[];
 };
+
+layout (local_size_x = 256, local_size_y = 1, local_size_z = 1) in;
 
 void main() {
 	uint neuron = gl_GlobalInvocationID.x+neuronsStart;
@@ -169,7 +198,7 @@ void main() {
 	
 	float sum = biases[neuron];
 	for(uint i=0; i<info.count; ++i) {
-		sum = weights[info.start+i] * x[connectedNeurons[info.start+i]];
+		sum += weights[info.start+i] * x[connectedNeurons[info.start+i]];
 	}
 	
 	y[neuron] = tanh(sum);
