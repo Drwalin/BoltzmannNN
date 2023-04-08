@@ -50,6 +50,8 @@ namespace bn {
 	void RandomBuffer(std::vector<float>& buf, uint32_t count, float min,
 			float max);
 	
+	void FillBufferWithRandom(gl::SimpleVBO<float>& vbo, float min, float max);
+	
 	class NeuralNetwork {
 	public:
 		
@@ -65,7 +67,9 @@ namespace bn {
 		
 		void PerformCalculation(uint32_t start, uint32_t count);
 		
-	private:
+		void UpdateBiasWeights(float* bias, float* weight);
+		
+	public:
 		
 		struct PerNeuronStatic {
 			uint32_t weights_start;

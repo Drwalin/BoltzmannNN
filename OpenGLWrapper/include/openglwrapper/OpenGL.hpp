@@ -61,8 +61,6 @@ namespace gl {
 		UNSIGNED_INT_2_10_10_10_REV = GL_UNSIGNED_INT_2_10_10_10_REV,
 		
 		UNSIGNED_INT_24_8 = GL_UNSIGNED_INT_24_8,
-		
-		
 	};
 
 	class OpenGL {
