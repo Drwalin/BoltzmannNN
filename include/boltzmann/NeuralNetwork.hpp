@@ -1,13 +1,13 @@
 /*
- *  This file is part of OpenGLWrapper.
- *  Copyright (C) 2021-2023 Marek Zalewski aka Drwalin
+ *  This file is part of BoltzmannNN
+ *  Copyright (C) 2023 Marek Zalewski aka Drwalin
  *
- *  OpenGLWrapper is free software: you can redistribute it and/or modify
+ *  BoltzmannNN is free software: you can redistribute it and/or modify
  *  it under the terms of the GNU General Public License as published by
  *  the Free Software Foundation, either version 3 of the License, or
  *  (at your option) any later version.
  *
- *  OpenGLWrapper is distributed in the hope that it will be useful,
+ *  BoltzmannNN is distributed in the hope that it will be useful,
  *  but WITHOUT ANY WARRANTY; without even the implied warranty of
  *  MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
  *  GNU General Public License for more details.
@@ -29,6 +29,18 @@ namespace gl {
 	class SimpleVBO : public gl::VBO {
 	public:
 		SimpleVBO() : gl::VBO(sizeof(T), gl::ARRAY_BUFFER, gl::DYNAMIC_DRAW) {}
+		
+		void UpdateElements(const T* data, uint32_t start, uint32_t count) {
+			if(start+count > this->GetVertexCount())
+				count = this->GetVertexCount()-start;
+			Update(data, start*sizeof(T), count*sizeof(T));
+		}
+		
+		void FetchElements(T* data, uint32_t start, uint32_t count) {
+			if(start+count > this->GetVertexCount())
+				count = this->GetVertexCount()-start;
+			Fetch(data, start*sizeof(T), count*sizeof(T));
+		}
 	};
 }
 
@@ -37,27 +49,49 @@ namespace bn {
 	public:
 		
 		NeuralNetwork();
-		~NeuralNetwork() {
-			new gl::VBO(13, gl::ARRAY_BUFFER, gl::DYNAMIC_DRAW);
-		}
+		~NeuralNetwork();
 		
-		void InitEmptyNetwork(const std::vector<std::vector<uint32_t>>& connections);
+		void InitEmptyNetwork(const std::vector<std::vector<uint32_t>>& structure);
 		
-		void PerformCalculation(uint32_t start, uint32_t count);
 		void SwapStates();
 		
-		void UpdateStates(const float* data, uint32_t start, uint32_t count);
-		void FetchStates(float* data, uint32_t start, uint32_t count);
+		void UpdateStates(const float* data, uint32_t start, uint32_t elements);
+		void FetchStates(float* data, uint32_t start, uint32_t elements);
+		
+		void PerformCalculation(uint32_t start, uint32_t count);
 		
 	private:
 		
-		std::vector<std::vector<uint32_t>> connections;
+		struct PerNeuronStatic {
+			uint32_t weights_start; // position of bias
+			uint32_t weights_count; // excluding bias. if no weights are
+									// present, then no bias is present either
+		};
+		struct WeightInfo {
+			uint32_t neuronId;
+			float weight;
+		};
 		
-		gl::VBO stateOld, stateNew;
-		gl::VBO weightsStructure;
-		gl::VBO perNeuronStatic;
+		uint32_t weightsAndBiasesCount, neuronsCount;
 		
-		gl::Shader shader;
+		std::vector<std::vector<uint32_t>> structure;
+		
+		
+		gl::SimpleVBO<float> *statePrevious, *stateNext;
+		gl::SimpleVBO<float> states[2];
+		gl::SimpleVBO<float> weightsStructure; // [ bias[0], weight[0][0],
+											   // weight[0][1], ...,
+											   // weight[0][n-1], bias[1],
+											   // weight[1][0], ...
+		gl::SimpleVBO<PerNeuronStatic> perNeuronStatic;
+		
+		std::vector<PerNeuronStatic> perNeuronStaticInfoHost;
+		
+		gl::Shader calculation;
+		
+	private:
+		
+		const static char* CALCULATIONS_SOURCE_CODE;
 	};
 }
 
