@@ -197,7 +197,19 @@ void main() {
 	}
 	
 	float sum = biases[neuron];
-	for(uint i=0; i<info.count; ++i) {
+	for(uint i=0; i<info.count; i+=4) {
+		vec4 W, X;
+		W[0] = weights[info.start+i+0];
+		W[1] = weights[info.start+i+1];
+		W[2] = weights[info.start+i+2];
+		W[3] = weights[info.start+i+3];
+		X[0] = x[connectedNeurons[info.start+i+0]];
+		X[1] = x[connectedNeurons[info.start+i+1]];
+		X[2] = x[connectedNeurons[info.start+i+2]];
+		X[3] = x[connectedNeurons[info.start+i+3]];
+		sum += dot(W, X);
+	}
+	for(uint i=info.count&0xFFFFFFFC; i<info.count; ++i) {
 		sum += weights[info.start+i] * x[connectedNeurons[info.start+i]];
 	}
 	
