@@ -28,7 +28,9 @@ namespace gl {
 	template<typename T>
 	class SimpleVBO : public gl::VBO {
 	public:
-		SimpleVBO() : gl::VBO(sizeof(T), gl::ARRAY_BUFFER, gl::DYNAMIC_DRAW) {}
+		SimpleVBO() : gl::VBO(sizeof(T), gl::ARRAY_BUFFER, gl::DYNAMIC_DRAW) {
+			this->Init();
+		}
 		
 		void UpdateElements(const T* data, uint32_t start, uint32_t count) {
 			if(start+count > this->GetVertexCount())
@@ -45,6 +47,9 @@ namespace gl {
 }
 
 namespace bn {
+	void RandomBuffer(std::vector<float>& buf, uint32_t count, float min,
+			float max);
+	
 	class NeuralNetwork {
 	public:
 		
@@ -63,31 +68,30 @@ namespace bn {
 	private:
 		
 		struct PerNeuronStatic {
-			uint32_t weights_start; // position of bias
-			uint32_t weights_count; // excluding bias. if no weights are
-									// present, then no bias is present either
-		};
-		struct WeightInfo {
-			uint32_t neuronId;
-			float weight;
+			uint32_t weights_start;
+			uint32_t weights_count;
 		};
 		
-		uint32_t weightsAndBiasesCount, neuronsCount;
+		uint32_t weightsCount, neuronsCount;
 		
 		std::vector<std::vector<uint32_t>> structure;
 		
 		
 		gl::SimpleVBO<float> *statePrevious, *stateNext;
-		gl::SimpleVBO<float> states[2];
-		gl::SimpleVBO<float> weightsStructure; // [ bias[0], weight[0][0],
-											   // weight[0][1], ...,
-											   // weight[0][n-1], bias[1],
-											   // weight[1][0], ...
+		
+		
 		gl::SimpleVBO<PerNeuronStatic> perNeuronStatic;
+		gl::SimpleVBO<float> states[2];
+		
+		gl::SimpleVBO<uint32_t> weightsStructure;
+		gl::SimpleVBO<float> weights;
+		
+		gl::SimpleVBO<float> bias;
+		
 		
 		std::vector<PerNeuronStatic> perNeuronStaticInfoHost;
 		
-		gl::Shader calculation;
+		gl::Shader calculationShader;
 		
 	private:
 		
